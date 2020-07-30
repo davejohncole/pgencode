@@ -105,7 +105,7 @@ pgencode_bytes_len(const char *bytes, int len, char *dest) {
 }
 
 static int
-pgencode_unicode(PyObject *obj, Py_ssize_t offset) {
+pgencode_unicode(PyObject *obj, int offset) {
     Py_ssize_t bytes_len;
     const char *bytes = PyUnicode_AsUTF8AndSize(obj, &bytes_len);
 
@@ -121,7 +121,7 @@ pgencode_unicode(PyObject *obj, Py_ssize_t offset) {
 }
 
 static int
-pgencode_bytes(PyObject *obj, Py_ssize_t offset) {
+pgencode_bytes(PyObject *obj, int offset) {
     char *bytes;
     Py_ssize_t bytes_len;
     
@@ -140,6 +140,47 @@ pgencode_bytes(PyObject *obj, Py_ssize_t offset) {
     return offset + measure;
 }
 
+static int pgencode_object(PyObject *obj, int offset) {
+    if (offset > 0) {
+        // \t delimiter
+        if (ensure_buff_capacity(offset + 1) < 0) {
+            return -1;
+        }
+        buff[offset++] = '\t';
+    }
+    if (PyUnicode_Check(obj)) {
+        offset = pgencode_unicode(obj, offset);
+    } else if (PyBytes_Check(obj)) {
+        offset = pgencode_bytes(obj, offset);
+    } else if (PySequence_Check(obj)) {
+        for (int i = 0; i < PySequence_Length(obj); i++) {
+            PyObject *item = PySequence_GetItem(obj, i);
+            if (item == NULL) {
+                return -1;
+            }
+            offset = pgencode_object(item, offset);
+            if (offset < 0) {
+                return -1;
+            }
+        }
+    } else if (obj == Py_None) {
+        // \\N
+        if (ensure_buff_capacity(offset + 2) < 0) {
+            return -1;
+        }
+        pgencode_bytes_len("\\N", 2, buff + offset);
+        offset += 2;
+    } else {
+        PyObject *encoded = PyObject_Str(obj);
+        if (encoded == NULL) {
+            return -1;
+        }
+        offset = pgencode_unicode(encoded, offset);
+        Py_DECREF(encoded);
+    }
+    return offset;
+}
+
 static PyObject *
 pgencode(PyObject *self, PyObject *args) {
     PyObject *obj;
@@ -148,50 +189,7 @@ pgencode(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    int size;
-    if (PyUnicode_Check(obj)) {
-        size = pgencode_unicode(obj, 0);
-    } else if (PyBytes_Check(obj)) {
-        size = pgencode_bytes(obj, 0);
-    } else if (PySequence_Check(obj)) {
-        size = 0;
-        for (int i = 0; i < PySequence_Length(obj); i++) {
-            if (i > 0) {
-                // \t delimiter
-                if (ensure_buff_capacity(size + 2) < 0) {
-                    return NULL;
-                }
-                pgencode_bytes_len("\\t", 2, buff + size);
-                size += 2;
-            }
-            PyObject *item = PySequence_GetItem(obj, i);
-            if (item == NULL) {
-                return NULL;
-            }
-            if (PyUnicode_Check(item)) {
-                size = pgencode_unicode(item, size);
-            } else if (PyBytes_Check(item)) {
-                size = pgencode_bytes(item, size);
-            } else {
-                PyObject *encoded = PyObject_Str(item);
-                if (encoded == NULL) {
-                    return NULL;
-                }
-                size = pgencode_unicode(encoded, size);
-                Py_DECREF(encoded);
-            }
-            if (size < 0) {
-                return NULL;
-            }
-        }
-    } else {
-        PyObject *encoded = PyObject_Str(obj);
-        if (encoded == NULL) {
-            return NULL;
-        }
-        size = pgencode_unicode(encoded, 0);
-        Py_DECREF(encoded);
-    }
+    int size = pgencode_object(obj, 0);
     if (size < 0) {
         return NULL;
     }
