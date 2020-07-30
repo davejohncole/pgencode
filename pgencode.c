@@ -140,8 +140,8 @@ pgencode_bytes(PyObject *obj, int offset) {
     return offset + measure;
 }
 
-static int pgencode_object(PyObject *obj, int offset) {
-    if (offset > 0) {
+static int pgencode_object(PyObject *obj, int offset, int suppress_delimiter) {
+    if (offset > 0 && !suppress_delimiter) {
         // \t delimiter
         if (ensure_buff_capacity(offset + 1) < 0) {
             return -1;
@@ -158,7 +158,7 @@ static int pgencode_object(PyObject *obj, int offset) {
             if (item == NULL) {
                 return -1;
             }
-            offset = pgencode_object(item, offset);
+            offset = pgencode_object(item, offset, i == 0);
             if (offset < 0) {
                 return -1;
             }
@@ -189,7 +189,7 @@ pgencode(PyObject *self, PyObject *args) {
         return NULL;
     }
 
-    int size = pgencode_object(obj, 0);
+    int size = pgencode_object(obj, 0, 0);
     if (size < 0) {
         return NULL;
     }
