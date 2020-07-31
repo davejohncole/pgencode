@@ -2,8 +2,8 @@
 
 PyObject *module;
 
-char *buff;                 /* temporary buffer */
-Py_ssize_t buff_size;       /* size of allocated buffer */
+static char *buff;                 /* temporary buffer */
+static Py_ssize_t buff_size;       /* size of allocated buffer */
 
 static int
 ensure_buff_capacity(Py_ssize_t size) {
@@ -16,6 +16,7 @@ ensure_buff_capacity(Py_ssize_t size) {
         while (new_buff_size < size) {
             new_buff_size *= 2;
         }
+        /* try to allocate new memory buffer */
         char *new_buff;
         if (buff == NULL) {
             new_buff = malloc(new_buff_size);
@@ -23,8 +24,10 @@ ensure_buff_capacity(Py_ssize_t size) {
             new_buff = realloc(buff, new_buff_size);
         }
         if (new_buff == NULL) {
+            PyErr_SetString(PyExc_MemoryError, "could not allocate encoding buffer");
             return -1;
         }
+        /* save new memory buffer */
         buff = new_buff;
         buff_size = new_buff_size;
     }
@@ -49,12 +52,10 @@ ensure_buff_capacity(Py_ssize_t size) {
  *   if chr(i) not in _pg_charmap:
  *       _pg_charmap[chr(i)] = '\\x%02x' % i
  */
-static char hexdigit[] = "0123456789abcdef";
-
 static int
 pgencode_bytes_len_measure(const char *bytes, Py_ssize_t len) {
     int size = 0;
-    for (int pos = 0; pos < len; pos++) {
+    while (len--) {
         char c = *bytes++;
         if (' ' <= c && c <= '~') {
             size++;
@@ -69,7 +70,9 @@ pgencode_bytes_len_measure(const char *bytes, Py_ssize_t len) {
 
 static void
 pgencode_bytes_len(const char *bytes, int len, char *dest) {
-    for (int pos = 0; pos < len; pos++) {
+    static char hexdigit[] = "0123456789abcdef";
+
+    while (len--) {
         char c = *bytes++;
         if (' ' <= c && c <= '~') {
             *dest++ = c;
@@ -112,7 +115,6 @@ pgencode_unicode(PyObject *obj, int offset) {
     /* measure how much space is required for output */
     int measure = pgencode_bytes_len_measure(bytes, bytes_len);
     if (ensure_buff_capacity(offset + measure) < 0) {
-        PyErr_SetString(PyExc_MemoryError, "could not allocate encoding buffer");
         return -1;
     }
     pgencode_bytes_len(bytes, bytes_len, buff + offset);
@@ -132,7 +134,6 @@ pgencode_bytes(PyObject *obj, int offset) {
     /* measure how much space is required for output */
     int measure = pgencode_bytes_len_measure(bytes, bytes_len);
     if (ensure_buff_capacity(offset + measure) < 0) {
-        PyErr_SetString(PyExc_MemoryError, "could not allocate encoding buffer");
         return -1;
     }
     pgencode_bytes_len(bytes, bytes_len, buff + offset);
