@@ -216,7 +216,7 @@ PyMODINIT_FUNC
 PyInit__pgencode(void) {
     module = PyModule_Create(&module_def);
     if (!module) {
-        return (0);
+        return NULL;
     }
 
     return module;
