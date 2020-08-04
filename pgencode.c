@@ -160,6 +160,7 @@ static int pgencode_object(PyObject *obj, int offset, int suppress_delimiter) {
                 return -1;
             }
             offset = pgencode_object(item, offset, i == 0);
+            Py_DECREF(item);
             if (offset < 0) {
                 return -1;
             }
