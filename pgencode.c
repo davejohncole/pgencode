@@ -57,7 +57,9 @@ pgencode_bytes_len_measure(const char *bytes, Py_ssize_t len) {
     int size = 0;
     while (len--) {
         char c = *bytes++;
-        if (' ' <= c && c <= '~') {
+        if (c == '\\') {
+            size += 2;
+        } else if (' ' <= c && c <= '~') {
             size++;
         } else if (8 <= c && c <= 13) {
             size += 2;
@@ -74,7 +76,10 @@ pgencode_bytes_len(const char *bytes, int len, char *dest) {
 
     while (len--) {
         char c = *bytes++;
-        if (' ' <= c && c <= '~') {
+        if (c == '\\') {
+            *dest++ = '\\';
+            *dest++ = '\\';
+        } else if (' ' <= c && c <= '~') {
             *dest++ = c;
         } else if (8 <= c && c <= 13) {
             *dest++ = '\\';
