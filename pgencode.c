@@ -175,8 +175,8 @@ static int pgencode_object(PyObject *obj, int offset, int suppress_delimiter) {
         if (ensure_buff_capacity(offset + 2) < 0) {
             return -1;
         }
-        pgencode_bytes_len("\\N", 2, buff + offset);
-        offset += 2;
+        buff[offset++] = '\\';
+        buff[offset++] = 'N';
     } else {
         PyObject *encoded = PyObject_Str(obj);
         if (encoded == NULL) {
